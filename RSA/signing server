@@ -1,0 +1,49 @@
+from Crypto.Util.number import bytes_to_long, long_to_bytes
+import telnetlib
+import json
+from sage.all import *
+
+HOST = "socket.cryptohack.org"
+PORT = 13374
+
+def readline():
+    return tn.read_until(b"\n")
+
+def json_recv():
+    line = readline().decode()
+    st = line[line.find('{'):]
+    return json.loads(st)
+
+def json_send(hsh):
+    request = json.dumps(hsh).encode()
+    tn.write(request)
+
+tn = telnetlib.Telnet(HOST, PORT)
+
+print(readline())
+
+stri = {"option" : "get_secret"}
+stri = json.dumps(stri)
+json_send(to_send)
+temp = json_recv()
+
+stri = {"option" : "sign", "msg" : temp["secret"]}
+stri = json.dumps(stri)
+to_send = json.loads(stri)
+
+json_send(to_send)
+temp = json_recv()
+
+print(bytes.fromhex(temp["signature"][2:]))
+Solution: crypto{d0n7_516n_ju57_4ny7h1n6}
+Explanation
+1.The code connects to a remote server using Telnet.
+2.It sends a request to retrieve a secret value from the server.
+3.The code requests a signature for the retrieved secret messages
+4.It prints the received signature in hexadecimal format.
+
+
+
+
+
+
