@@ -1,0 +1,92 @@
+#Moving Problems
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+import hashlib
+
+
+def is_pkcs7_padded(message):
+    padding = message[-message[-1]:]
+    return all(padding[i] == len(padding) for i in range(0, len(padding)))
+
+
+def decrypt_flag(shared_secret: int, iv: str, ciphertext: str):
+    # Derive AES key from shared secret
+    sha1 = hashlib.sha1()
+    sha1.update(str(shared_secret).encode('ascii'))
+    key = sha1.digest()[:16]
+    # Decrypt flag
+    ciphertext = bytes.fromhex(ciphertext)
+    iv = bytes.fromhex(iv)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    plaintext = cipher.decrypt(ciphertext)
+
+    if is_pkcs7_padded(plaintext):
+        return unpad(plaintext, 16).decode('ascii')
+    else:
+        return plaintext.decode('ascii')
+
+
+shared_secret = secret
+iv = "eac58c26203c04f68d63dc2c58d79aca"
+ciphertext = 'bb9ecbd3662d0671fd222ccb07e27b5500f304e3621a6f8e9c815bc8e4e6ee6ebc718ce9ca115cb4e41acb90dbcabb0d'
+
+print(decrypt_flag(shared_secret, iv, ciphertext))
+def mov_attack(a,b,p,gx,gy,ax):
+    F = GF(p)
+    E = EllipticCurve(F,[a,b])
+    order = E.order()
+
+    k = 1 
+    while k<100:
+        if ((p**k)-1)%order == 0:
+            break
+        k += 1
+    print(k)
+    
+    Fy = GF(p^k,'y')
+    Ee = EllipticCurve(Fy,[a,b])
+
+    P = E((gx,gy))
+    xP = E.lift_x(ax)
+
+    Pe = Ee(P)
+    xPe = Ee(xP)
+
+    R = Ee.random_point()
+    m = R.order()
+    d = gcd(m, P.order())
+    print(d)
+    Q = (m//d)*R
+
+    assert P.order()/Q.order() in ZZ
+    assert P.order() == Q.order()
+
+    n = P.order()
+    print('computing pairings')
+    alpha = Pe.weil_pairing(Q,n)
+    beta = xPe.weil_pairing(Q,n)
+
+    print('computing log')
+    dd = beta.log(alpha)
+    return dd
+
+
+gx = 479691812266187139164535778017
+gy = 568535594075310466177352868412
+
+a = -35
+b = 98
+p = 1331169830894825846283645180581
+
+E = EllipticCurve(GF(p), [a, b])
+A = E.lift_x(1110072782478160369250829345256)
+B = E.lift_x(1290982289093010194550717223760)
+
+n_a = mov_attack(a,b,p,gx,gy,1110072782478160369250829345256)
+secret = (B*int(n_a)).xy()[0]
+Flag:crypto{MOV_attack_on_non_supersingular_curves}
+Explanation of the code:
+1.Before decrypting the message, the code checks if it is padded correctly using the PKCS7 standard.
+2.The shared secret (a number derived from elliptic curve operations) is used to generate an AES key for decryption.
+3.The ciphertext (encrypted message) and initialization vector (IV) are needed to perform decryption.
+4.After decryption, the code checks and removes any padding that was added during encryption.
