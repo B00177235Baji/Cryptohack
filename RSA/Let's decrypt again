@@ -1,0 +1,138 @@
+import socket
+import json
+import re
+import hashlib
+import random
+import sympy
+from Crypto.Util.number import bytes_to_long, long_to_bytes, getPrime, inverse, isPrime
+from pkcs1 import emsa_pkcs1_v15
+
+
+HOST = "socket.cryptohack.org"
+PORT = 13394
+BIT_LENGTH = 768
+BTC_PAT = re.compile(r"^Please send all my money to ([1-9A-HJ-NP-Za-km-z]+)$")
+
+
+def readline(sock):
+    return sock.recv(1024).decode("utf-8")
+
+def json_recv(sock):
+    line = readline(sock)
+    return json.loads(line[line.find('{'):])
+
+def json_send(sock, payload):
+    request = json.dumps(payload).encode()
+    sock.sendall(request)
+
+def open_socket():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((HOST, PORT))
+    return sock
+
+
+def btc_check(msg):
+    alpha = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    addr = BTC_PAT.match(msg)
+    if not addr:
+        return False
+    addr = addr.group(1)
+    raw = b"\0" * (len(addr) - len(addr.lstrip(alpha[0])))
+    res = sum(alpha.index(c) * (58 ** i) for i, c in enumerate(reversed(addr)))
+    raw += long_to_bytes(res)
+    return len(raw) == 25 and raw[0] in [0, 5] and raw[-4:] == hashlib.sha256(hashlib.sha256(raw[:-4]).digest()).digest()[:4]
+
+def get_signature(sock):
+    json_send(sock, {"option": "get_signature"})
+    return json_recv(sock)["signature"]
+
+def set_pubkey(sock, pubkey):
+    json_send(sock, {"option": "set_pubkey", "pubkey": pubkey})
+    return json_recv(sock)
+
+def claim_flag(sock, msg, e, index):
+    json_send(sock, {
+        "option": "claim",
+        "msg": msg.decode(),
+        "e": e,
+        "index": index
+    })
+    return json_recv(sock)
+
+def valid_message(msg, index, N, E, suffix, signature):
+    digest = emsa_pkcs1_v15.encode(msg, BIT_LENGTH // 8)
+    calculated_digest = pow(signature, E, N)
+    return bytes_to_long(digest) == calculated_digest
+
+def find_valid_messages(sock, signature):
+    n, suffix = get_modulus_and_suffix(signature)
+    set_pubkey(sock, hex(n))
+    final_patterns = []
+
+    for index, patterns in enumerate(generate_test_patterns(suffix)):
+        temp = [
+            (msg, e) for msg, e in patterns if valid_message(msg, index, n, e, suffix, signature)
+        ]
+        if temp:
+            final_patterns.append(temp)
+
+    return final_patterns if len(final_patterns) == 3 else None
+
+def get_modulus_and_suffix(signature):
+    modulus, order_factors = get_large_smooth_modulus(signature, 800)
+    suffix = emsa_pkcs1_v15.encode(b"", BIT_LENGTH // 8)
+    return modulus, suffix
+
+def generate_test_patterns(suffix):
+    messages = [b"Test message 1", b"Test message 2"]  # Replace with actual patterns
+    return [[(msg + suffix, random.randint(1, 2**16)) for msg in messages]]
+
+def get_large_smooth_modulus(base, bit_size):
+    modulus, factors = 1, {}
+    while modulus.bit_length() < bit_size:
+        prime, order_factors = get_smooth_prime(1 << 10)
+        if prime != -1:
+            modulus *= prime
+            factors.update(order_factors)
+    return modulus, factors
+
+def get_smooth_prime(B):
+    order_factors = {}
+    for _ in range(100):
+        prime = sympy.randprime(0, B)
+        exp = random.randint(1, 10)
+        order_factors[prime] = exp
+        if isPrime(prime**exp + 1):
+            return prime**exp + 1, order_factors
+    return -1, {}
+
+def main():
+    tries = 0
+    while True:
+        tries += 1
+        sock = open_socket()
+        readline(sock)
+        signature = int(get_signature(sock)[2:], 16)
+        final_patterns = find_valid_messages(sock, signature)
+
+        if final_patterns:
+            for index, (msg, e) in enumerate(final_patterns):
+                res = claim_flag(sock, msg[0], hex(msg[1]), str(index))
+                if res['msg'] == "Congratulations, here's a secret":
+                    print("Flag: ", res['secret'])
+                    return
+        sock.close()
+        print(f"Retrying... Attempt {tries}")
+
+if __name__ == "__main__":
+    main()
+Solution : crypto{let's_decrypt_w4s_t0o_ez_do_1t_ag41n}
+Explanation
+1.We receive the first N,E, and SIGNATURE
+2.When we give fresh N, we get the suffix.
+3.To obtain the flag, we must produce a message/E with three types of patterns, such that encode(msg+suffix) == SIGNATURE^E% N.
+4.Patterns areThis is a (.*) test for a false signature.$ ^My name is ([a-zA-Z\s]+) and I run CryptoHack.org.$ btc_check
+5.The values associated with each pattern are: [a, b, a^b^flag].
+6.Valid bitcoin addresses can be obtained from the internet (BTC_valid_addresses) and meet the btc_check function requirements.
+7.We have a partial discrete logarithm where we need to find e, n given g, h st g^x == h mod n. We can utilize Pohlig Hellman algorithm with smooth primes to get the perfect combination.
+
