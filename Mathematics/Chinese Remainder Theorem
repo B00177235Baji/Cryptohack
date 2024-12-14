@@ -1,0 +1,11 @@
+from sage.all import *
+
+rem = [2,3,5]
+p = [5,11,17]
+
+print(crt(rem, p))
+solution: 872
+Explanation
+1.The code imports all functions from the SageMath library.
+2.Lists rem = [2,3,5] and p = [5,11,17] are defined.
+3.The result of the CRT calculation is printed.
