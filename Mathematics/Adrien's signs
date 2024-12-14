@@ -1,0 +1,25 @@
+from random import randint
+
+a = 288260533169915
+p = 1007621497415251
+
+FLAG = b'crypto{????????????????????}'
+
+def encrypt_flag(flag):
+    ciphertext = []
+    # Convert flag to binary representation
+    plaintext = ''.join(f'{i:08b}' for i in flag)
+    for b in plaintext:
+        e = randint(1, p)
+        n = pow(a, e, p)
+        # Append encrypted value based on binary bit
+        ciphertext.append(n if b == '1' else -n % p)
+    return ciphertext
+
+if __name__ == "__main__":
+    print(encrypt_flag(FLAG))
+Solution:crypto{p4tterns_1n_re5idu3s}
+Explanation
+1.The code defines constants a and p, representing numbers used in encryption. The variable FLAG contains a secret message in bytes.
+2.The function encrypt_flag turns each flag byte into an 8-bit binary string, resulting in a message that is represented continuously in binary.
+3.Modular exponentiation is used to calculate the value n = pow(a, e, p), yielding the result a^e% p.
