@@ -1,0 +1,70 @@
+from Crypto.Util.number import inverse, bytes_to_long, long_to_bytes
+from sympy import GF, PolynomialRing, discrete_log, Integers
+
+def cusp_solver(G, H, p):
+    """
+    Solves for the discrete logarithm in the cusp case, where the elliptic curve points
+    G and H are related by a simple linear transformation.
+    """
+    R = Integers(p)
+    u = R(G[1]) // R(G[0])  # Compute u
+    v = R(H[1]) // R(H[0])  # Compute v
+    return discrete_log(v, u)  # Return discrete log
+
+def node_solver(G, H, p, a):
+    """
+    Solves for the discrete logarithm in the node case, where the elliptic curve points
+    G and H are transformed by a node-related transformation using the parameter a.
+    """
+    R = Integers(p)
+    u = R(G[1] - a * G[0]) // R(G[1] + a * G[0])  # Compute u
+    v = R(H[1] - a * H[0]) // R(H[1] + a * H[0])  # Compute v
+    return discrete_log(v, u)  # Return discrete log
+
+# Elliptic curve parameters
+p = 4368590184733545720227961182704359358435747188309319510520316493183539079703
+g = [8742397231329873984594235438374590234800923467289367269837473862487362482, 
+     225987949353410341392975247044711665782695329311463646299187580326445253608]
+A = [2582928974243465355371953056699793745022552378548418288211138499777818633265, 
+     2421683573446497972507172385881793260176370025964652384676141384239699096612]
+
+# Curve equation: y^2 = x^3 + ax + b
+# Compute the coefficients a and b of the elliptic curve
+a = ((g[1]**2) - (A[1]**2) - (g[0]**3) + (A[0]**3)) // Integers(p)(g[0] - A[0])
+b = (g[1]**2) - (g[0]**3) - (a * g[0])
+
+# Define the polynomial ring over GF(p) for the elliptic curve equation
+P.<x, y> = PolynomialRing(GF(p))
+f = x**3 + a*x + b  # The elliptic curve equation in polynomial form
+
+# Variable to store the solution
+n_a = 0
+
+# Check if the factorization of the curve equation has one or two factors
+if len(f.factor()) == 1:
+    # If there's only one factor, solve using cusp_solver
+    n_a = cusp_solver(g, A, p)
+
+if len(f.factor()) == 2:
+    # If there are two factors, handle the singular point case
+    singular_pt = f.factor()[0][0].coefficient({x: 0}) + f.factor()[1][0].coefficient({x: 0})
+    if f.factor()[0][1] == 2:
+        singular_pt -= 2 * f.factor()[0][0].coefficient({x: 0})
+        g[0] += f.factor()[0][0].coefficient({x: 0})
+        A[0] += f.factor()[0][0].coefficient({x: 0})
+    else:
+        singular_pt -= 2 * f.factor()[1][0].coefficient({x: 0})
+        g[0] += f.factor()[1][0].coefficient({x: 0})
+        A[0] += f.factor()[1][0].coefficient({x: 0})
+    
+    singular_pt = GF(p)(singular_pt).square_root()  # Compute the square root of the singular point
+    n_a = node_solver(g, A, p, singular_pt)  # Solve using node_solver
+
+# Print the result and the corresponding bytes representation
+print(n_a, long_to_bytes(n_a))
+Flag: crypto{s1ngul4r_s1mplif1c4t1on}.
+Explanation about this code:
+1.The code defines an elliptic curve over a finite field using a large prime number p and two points, g and A. These points are on the elliptic curve, and the goal is to solve a cryptographic problem involving the discrete logarithm of these points.
+2.If the curve equation has one factor, the cusp_solver function is used to compute the discrete logarithm between the points g and A.
+3.If the curve equation has two factors, the code handles the singular point by adjusting the points g and A accordingly and then uses the node_solver function to compute the discrete logarithm.
+4.the code is solving a discrete logarithm problem on an elliptic curve using mathematical operations to derive the solution based on the structure of the curve and its points.
