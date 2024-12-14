@@ -1,0 +1,34 @@
+from sage.all import *
+
+P = 2
+N = 50
+E = 31337
+
+FLAG = b'crypto{??????????????????????????}'
+
+def recover_plaintext(mat):
+    temp = ""
+    for i in range(N):
+        for j in range(N):
+            temp = temp + str(mat[j][i])
+
+    temp = temp[:len(FLAG) * 8]
+    return int(temp, 2).to_bytes((len(temp) + 7) // 8, 'big')
+
+def load_matrix(fname):
+    data = open(fname, 'r').read().strip()
+    rows = [list(map(int, row)) for row in data.splitlines()]
+    return Matrix(GF(P), rows)
+
+ciphertext = load_matrix("flag.enc")
+d = pow(E, -1, ciphertext.multiplicative_order())
+mat = ciphertext ** d
+print(recover_plaintext(mat))
+
+Solution: 
+Explanation
+1.This code defines a cryptographic setup where P, N, and E are key parameters. The recover_plaintext function processes a matrix and extracts a binary string, which is then converted into the original message.
+2.The function reads the file flag.enc to load a matrix of encrypted data, where the matrix elements are integers modulo P.
+3.It calculates the modular inverse of E to obtain the decryption exponent d.
+4.The ciphertext matrix is then raised to the power of d to decrypt it.
+5.Finally, the decrypted matrix is passed to recover_plaintext, which converts it into the original flag in byte form.
