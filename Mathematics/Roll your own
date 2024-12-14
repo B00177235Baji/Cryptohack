@@ -1,0 +1,60 @@
+from Crypto.Util.number import bytes_to_long, long_to_bytes
+import telnetlib
+import json
+
+HOST = "socket.cryptohack.org"
+PORT = 13403
+
+def check_params(data, q):
+    g = int(data['g'], 16)
+    n = int(data['n'], 16)
+    return g >= 2 and n >= 2 and pow(g, q, n) == 1
+
+def readline():
+    return tn.read_until(b"\n").decode().strip()
+
+def json_recv():
+    line = readline()
+    return json.loads(line[line.find('{'):])
+
+def json_send(hsh):
+    request = json.dumps(hsh).encode()
+    tn.write(request)
+
+tn = telnetlib.Telnet(HOST, PORT)
+
+# Receive initial value of q
+get_str = readline()
+q = int(get_str[18:-2], 0)
+
+g = q + 1
+n = q * q
+
+# Prepare and send first JSON payload
+to_send = {
+    "g": hex(g),
+    "n": hex(n)
+}
+json_send(to_send)
+
+# Receive response and calculate private key
+get_str = readline()
+g_x = int(get_str[72:-2], 0)
+x = (g_x - 1) // q
+
+# Prepare and send second JSON payload
+to_send = {
+    "x": hex(x)
+}
+json_send(to_send)
+
+# Print final response
+print(readline())
+
+
+Solution:crypto{Grabbing_Flags_with_Pascal_Paillier}
+Explanation
+1.The code establishes a Telnet connection to the server at socket.cryptohack.org on port 13403.
+2.It reads the initial message from the server, extracts the value of q from the response, and calculates g = q + 1 and n = q * q.
+3.A JSON payload containing g and n as hexadecimal values is sent to the server. This is part of the Paillier cryptosystem setup.
+4.The private key x is sent back to the server, and the final response containing the flag is printed.
