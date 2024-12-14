@@ -1,0 +1,3 @@
+result = pow(101, 17, 22663)
+result
+ Solution: 19906
