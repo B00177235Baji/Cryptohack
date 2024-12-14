@@ -1,0 +1,83 @@
+#prosign3
+
+import hashlib
+import telnetlib
+import json
+from Crypto.Util.number import bytes_to_long, long_to_bytes
+from ecdsa.ecdsa import Public_key, Private_key, Signature, generator_192
+from datetime import datetime
+from random import randrange
+from sage.all import *
+
+g = generator_192
+n = g.order()
+
+HOST = "socket.cryptohack.org"
+PORT = 13381
+
+def readline():
+    return tn.read_until(b"\n")
+
+def json_recv():
+    line = readline().decode()
+    st = line[line.find('{'):]
+    return json.loads(st)
+
+def json_send(hsh):
+    request = json.dumps(hsh).encode()
+    tn.write(request)
+
+tn = telnetlib.Telnet(HOST, PORT)
+print(readline())
+
+to_send = json.loads(json.dumps({"option" : "sign_time"}))
+json_send(to_send)
+inp = json_recv()
+print(inp)
+
+def sha1(data):
+    sha1_hash = hashlib.sha1()
+    sha1_hash.update(data)
+    return sha1_hash.digest()
+
+def encod(msg, k):
+    hsh = sha1(msg.encode())
+    sig = privkey.sign(bytes_to_long(hsh), k)
+    return hex(sig.r), hex(sig.s)
+
+k = 60
+msg = "unlock"
+
+for i in range(1,k+1):
+    h = sha1(inp["msg"].encode())
+    R = Integers(n) 
+    secret = int(R((int(inp["s"],16)*i)-bytes_to_long(h))//R(int(inp["r"],16)))
+
+    try:
+        pubkey = Public_key(g, g * secret)
+        privkey = Private_key(pubkey, secret)
+        r,s = encod(msg, i)
+        to_send = json.loads(json.dumps({"option" : "verify", "msg" : msg, "r" : r, "s" : s}))
+        json_send(to_send)
+        print(readline())
+    except:
+        continue
+b'Welcome to ProSign 3. You can sign_time or verify.\n'
+{'msg': 'Current time is 7:21', 'r': '0xaa7c4f9ef99e3e96d1aede2bd9238842859bb150d1fe9d85', 's': '0x87de86a02478ddca58ad7222a1a70f4cfb0918bc579f6358'}
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"result": "Bad signature"}\n'
+b'{"flag": "crypto{ECDSA_700_345y_70_5cr3wup}"}\n'
+Flag:
+crypto{ECDSA_700_345y_70_5cr3wup}
+Explanation of this code:
+1.The program establishes a connection to the server at socket.cryptohack.org using Telnet. The server responds with a welcome message.
+2.The program sends a request to the server asking to "sign_time." The server responds with the current time message and two cryptographic values (r and s) used for ECDSA (Elliptic Curve Digital Signature Algorithm).
+3.Using the received values (r and s), the program calculates a secret key by solving a mathematical equation derived from the ECDSA signature process. It tries different values of a nonce (k) to find the correct secret key.
+4.Once the secret key is found, the program creates a valid signature for the message "unlock" using the secret key and the ECDSA algorithm.
