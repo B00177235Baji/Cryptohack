@@ -1,0 +1,63 @@
+#MD0
+from Crypto.Util.number import bytes_to_long, long_to_bytes
+import telnetlib
+from Crypto.Cipher import AES
+import json
+import re
+from pkcs1 import emsa_pkcs1_v15
+from sage.all import *
+import fastecdsa
+from fastecdsa.point import Point
+from Crypto.Util.Padding import pad
+
+def bxor(a, b):
+    return bytes(x ^ y for x, y in zip(a, b))
+
+
+def hash(data, sig):
+    data = pad(data, 16)
+    out = sig
+#     print(data)
+    for i in range(0, len(data), 16):
+        blk = data[i:i+16]
+#         print(blk)
+        out = bxor(AES.new(blk, AES.MODE_ECB).encrypt(out), out)
+    return out
+
+HOST = "socket.cryptohack.org"
+PORT = 13388
+
+def readline():
+    return tn.read_until(b"\n")
+
+def json_recv():
+    line = readline().decode()
+    st = line[line.find('{'):]
+    return json.loads(st)
+
+def json_send(hsh):
+    request = json.dumps(hsh).encode()
+    tn.write(request)
+
+tn = telnetlib.Telnet(HOST, PORT)
+print(readline())
+
+to_send = json.loads(json.dumps({"option" : "sign", "message" : bytes([0]*15).hex()}))
+json_send(to_send)
+sig = json_recv()["signature"]
+sig = hash(b'admin=True',bytes.fromhex(sig))
+
+to_send = json.loads(json.dumps({"option" : "get_flag", "message" : (bytes([0]*15)+bytes([1])+b'admin=True').hex(), "signature" : sig.hex()}))
+json_send(to_send)
+print(json_recv())
+
+# print(bytes([16]*16))
+# hh = hash(("0000000admin=Tru").encode(), bytes([16]*16))
+Flag:crypto{l3ngth_3xT3nd3r}
+Explanation of the code:
+1.The code imports several libraries, including AES for encryption and json for handling data, along with others related to elliptic curve cryptography and padding.
+2.The helper function bxor takes two byte strings, a and b, and returns their byte-wise XOR. This is commonly used for encryption-related tasks.
+3.The function hash(data, sig) performs a custom hashing operation. It pads the input data to 16 bytes and iterates over it in blocks of 16 bytes. For each block, it encrypts it using the AES algorithm in ECB mode and XORs the result with an output signature (sig). The output is updated at each step, simulating a type of block cipher chaining
+4.The code sends a JSON request to the server to "sign" a message. The message being signed consists of 15 zero bytes (bytes([0]*15)).
+5.After sending the message, the server responds with a signature, which is then passed to the custom hash function along with the string 'admin=True'. This produces a new "hashed" signature.
+6.This code interacts with a remote server by first signing a message, modifying the signature with a custom hash function, and then using this modified signature to authenticate a request for a flag. 
